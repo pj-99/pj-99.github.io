@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
-    <title>4x11 If-Then-Else</title>
+    <title>Shared Notes</title>
     <link>https://pj-99.github.io/</link>
-    <description>Recent content on 4x11 If-Then-Else</description>
+    <description>Recent content on Shared Notes</description>
     <image>
       <url>https://pj-99.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
       <link>https://pj-99.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
@@ -19,10 +19,9 @@
       <description>Context 想用 Unity 做一個類似 Android Card View 的 UI &amp;hellip;
 UI 的需求是 corner + soft shadow ，而且希望可以方便的調整 corner 的 radius 跟 shadow 的深淺，試了一些 package 後，找到相見恨晚的 Shapes2D 👍
 Shapes2D: Shapes2D - Procedural sprites and UI | Sprite Management | Unity Asset Store
-效果 方法 使用 2 個有 Shape &amp;amp; Image 的 GameObject，一個當陰影，一個放 UI 本體。
-- Parent (For the shadow) - Child (For the original UI) （不知道有沒有其他方法可以直接使用 1 個 GameObject，畢竟 2 個還是不太方便）</description>
+效果 方法 使用 2 個有 Shape &amp;amp; Image 的 GameObject，一個當陰影，一個放 UI 本體
+- Parent (For the shadow) - Child (For the original UI) （不知道有沒有其他方法可以直接使用 1 個 GameObject 達成，畢竟 2 個還是不太方便）</description>
     </item>
-    
     
   </channel>
 </rss>
