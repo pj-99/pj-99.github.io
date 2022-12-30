@@ -1,0 +1,3 @@
+User-agent: *
+Disallow:
+Sitemap: https://pj-99.github.io/sitemap.xml
