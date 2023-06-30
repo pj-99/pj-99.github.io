@@ -8,16 +8,6 @@
       <url>https://pj-99.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</url>
       <link>https://pj-99.github.io/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E</link>
     </image>
-    <generator>Hugo -- gohugo.io</generator>
-    <lastBuildDate>Fri, 30 Dec 2022 07:27:56 +0800</lastBuildDate><atom:link href="https://pj-99.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
-    <item>
-      <title>Unity</title>
-      <link>https://pj-99.github.io/categories/unity/</link>
-      <pubDate>Fri, 30 Dec 2022 07:27:56 +0800</pubDate>
-      
-      <guid>https://pj-99.github.io/categories/unity/</guid>
-      <description></description>
-    </item>
-    
+    <generator>Hugo -- gohugo.io</generator><atom:link href="https://pj-99.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
   </channel>
 </rss>
