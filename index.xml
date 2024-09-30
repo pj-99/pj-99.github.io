@@ -1,4 +1,56 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – PJ's blog</title><link>https://pj-99.github.io/</link><description>Recent content in PJ's blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>Go - Channels</title><link>https://pj-99.github.io/blog/go/go_channels/</link><pubDate>Mon, 23 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/go/go_channels/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – PJ's blog</title><link>https://pj-99.github.io/</link><description>Recent content in PJ's blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>Git - How to merge two repositories into one using git subtree add</title><link>https://pj-99.github.io/blog/git/merge_two_repos/</link><pubDate>Mon, 30 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/git/merge_two_repos/</guid><description>
+&lt;h2>How to merge two repositories into one&lt;span class="hx-absolute -hx-mt-20" id="how-to-merge-two-repositories-into-one">&lt;/span>
+&lt;a href="#how-to-merge-two-repositories-into-one" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>例如你已經開發一個 web 一段時間，有一個 backend 的 repo 和一個 frontend 的 repo，現在想要將它們合併成一個 repo，又不想完全失去之前的歷史記錄，就可以用 &lt;code>git subtree add&lt;/code> 加入指定 repo 的 commit tree。&lt;/p>
+&lt;h2>git subtree add&lt;span class="hx-absolute -hx-mt-20" id="git-subtree-add">&lt;/span>
+&lt;a href="#git-subtree-add" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">git subtree add -P &amp;lt;prefix&amp;gt; add &amp;lt;repository&amp;gt; &amp;lt;remote-ref&amp;gt;&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;ul>
+&lt;li>&lt;code>&amp;lt;prefix&amp;gt;&lt;/code>: 要放在哪個 subdirectory&lt;/li>
+&lt;li>&lt;code>&amp;lt;repository&amp;gt;&lt;/code>: repository link&lt;/li>
+&lt;li>&lt;code>&amp;lt;remote-ref&amp;gt;&lt;/code>: branch&lt;/li>
+&lt;/ul>
+&lt;h2>Example&lt;span class="hx-absolute -hx-mt-20" id="example">&lt;/span>
+&lt;a href="#example" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># Go to your new project folder and init git&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="nb">echo&lt;/span> &lt;span class="s2">&amp;#34;# my_project&amp;#34;&lt;/span> &amp;gt;&amp;gt; README.md
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">git init
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1"># You must have one commit to use git subtree add&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">git add README.md
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">git commit -m &lt;span class="s2">&amp;#34;first commit&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># For example, put the backend repo into the backend folder&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">git subtree add -P backend https://github.com/path_to_backend.git main
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># And frontend folder&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">git subtree add -P frontend https://github.com/path_to_frontend.git main&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h2>Ref&lt;span class="hx-absolute -hx-mt-20" id="ref">&lt;/span>
+&lt;a href="#ref" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;ul>
+&lt;li>&lt;a href="https://stackoverflow.com/a/32684526/19055115" target="_blank" rel="noopener">https://stackoverflow.com/a/32684526/19055115&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://github.com/git/git/blob/master/contrib/subtree/git-subtree.txt" target="_blank" rel="noopener">git subtree&lt;/a>
+&lt;ul>
+&lt;li>除了 add 還有 merge 、split 等等各種進階的用法&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul></description></item><item><title>Go - Channels</title><link>https://pj-99.github.io/blog/go/go_channels/</link><pubDate>Mon, 23 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/go/go_channels/</guid><description>
 &lt;h2>Channel&lt;span class="hx-absolute -hx-mt-20" id="channel">&lt;/span>
 &lt;a href="#channel" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>Channel 是個 typed 的管道，go 程式可以透過 channel operator &lt;code>&amp;lt;-&lt;/code> 去接受或發送某個值。透過 channel 可以同步不同的 Goroutine。&lt;/p>
 &lt;p>箭頭的方向就代表了資料的傳輸方向：&lt;/p>
