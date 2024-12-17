@@ -1,4 +1,61 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – PJ's blog</title><link>https://pj-99.github.io/</link><description>Recent content in PJ's blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>Git - How to merge two repositories into one using git subtree add</title><link>https://pj-99.github.io/blog/git/merge_two_repos/</link><pubDate>Mon, 30 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/git/merge_two_repos/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – PJ's blog</title><link>https://pj-99.github.io/</link><description>Recent content in PJ's blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 存取外網與 VPC</title><link>https://pj-99.github.io/blog/aws/lambda/lambda_access_interent_and_vpc/</link><pubDate>Sun, 01 Dec 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/aws/lambda/lambda_access_interent_and_vpc/</guid><description>
+&lt;p>lambda 在 VPC 內不能直接對外連線，除非用 NAT 或給 lambda 網卡，但這些功能目前需要費用。&lt;/p>
+&lt;p>因此如果要在預算有限（&lt;del>或根本沒有預算&lt;/del>）的情況下讓 lambda 可以存取 VPC 內的資源（如 RDS）又和外網的伺服器溝通的話，是比較難直接做到的，但還是可以透過下列的方法達成：分成 VPC 內的 lambda 以及外網的 lambda，再使用 lambda destination 連接兩者。&lt;/p>
+&lt;h2>Lambda destination&lt;span class="hx-absolute -hx-mt-20" id="lambda-destination">&lt;/span>
+&lt;a href="#lambda-destination" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;ul>
+&lt;li>&lt;a href="https://aws.amazon.com/tw/blogs/compute/introducing-aws-lambda-destinations/" target="_blank" rel="noopener">lambda destination&lt;/a> 可以讓指定這個 lambda 成功或失敗後要觸發什麼事
+&lt;ul>
+&lt;li>可觸發的功能包含： AWS SNS, SQS, lambda, Eventbridge 等等&lt;/li>
+&lt;li>比較特別的是 lambda 的呼叫方式有分 sync 和 async，&lt;strong>只有 async 呼叫方式會觸發 lambda destination&lt;/strong>
+&lt;ul>
+&lt;li>例如：
+&lt;ul>
+&lt;li>在 AWS console 用 test 戳它是 sync，所以不會觸發 lambda destination&lt;/li>
+&lt;li>被 EventBridge 的 event 觸發是 async&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h3>Lambda 存取外網和 VPC 的一種 workaround&lt;span class="hx-absolute -hx-mt-20" id="lambda-存取外網和-vpc-的一種-workaround">&lt;/span>
+&lt;a href="#lambda-%e5%ad%98%e5%8f%96%e5%a4%96%e7%b6%b2%e5%92%8c-vpc-%e7%9a%84%e4%b8%80%e7%a8%ae-workaround" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;ol>
+&lt;li>用兩個 lambda，一個 lambda 做 public 的事情，另一個 lambda 做 VPC 的事情&lt;/li>
+&lt;li>根據需求連接 lambda（傳遞資料）
+&lt;ul>
+&lt;li>可連接的方式：s3, lambda destination, dynamoDB 等等&lt;/li>
+&lt;li>s3 和 dynamoDB 是少數 VPC 內可以（免費）存取的 AWS 服務，但仍要設定 gateway endpint，讓 VPC 可以透過 gateway endpoint 存取這些 AWS 資源，例如如果使用 AWS CDK ，需要讓 VPC 存取 s3 時要新增的部分：&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ol>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-typescript" data-lang="typescript">&lt;span class="line">&lt;span class="cl">&lt;span class="nx">vpc&lt;/span>&lt;span class="p">.&lt;/span>&lt;span class="nx">addGatewayEndpoint&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;S3Gateway&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nx">service&lt;/span>: &lt;span class="kt">ec2.GatewayVpcEndpointAwsService.S3&lt;/span>&lt;span class="p">,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">});&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>以需要「打第三方 API 並放到 VPC 內的資料庫」為例：&lt;/p>
+&lt;ul>
+&lt;li>用 s3 連接：
+&lt;ul>
+&lt;li>public lambda 打第三方 API，將打完拿到的資料存到 s3，VPC lambda 再從 s3 抓下來&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;li>用 lambda destination 的 response 與 event 連接:
+&lt;ul>
+&lt;li>public lambda 打第三方 API，將資料放於 response，設定 destination 為 VPC lambda，VPC lambda 就能從 event 中取得需要的資訊&lt;/li>
+&lt;li>另外 lambda input event 有長度限制，太長可以透過 gzip 等等方式壓縮&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul></description></item><item><title>Git - How to merge two repositories into one using git subtree add</title><link>https://pj-99.github.io/blog/git/merge_two_repos/</link><pubDate>Mon, 30 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/git/merge_two_repos/</guid><description>
 &lt;h2>How to merge two repositories into one&lt;span class="hx-absolute -hx-mt-20" id="how-to-merge-two-repositories-into-one">&lt;/span>
 &lt;a href="#how-to-merge-two-repositories-into-one" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>例如你已經開發一個 web 一段時間，有一個 backend 的 repo 和一個 frontend 的 repo，現在想要將它們合併成一個 repo，又不想完全失去之前的歷史記錄，就可以用 &lt;code>git subtree add&lt;/code> 加入指定 repo 的 commit tree。&lt;/p>
 &lt;h2>git subtree add&lt;span class="hx-absolute -hx-mt-20" id="git-subtree-add">&lt;/span>
