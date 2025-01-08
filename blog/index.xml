@@ -1,65 +1,64 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Blog</title><link>https://pj-99.github.io/blog/</link><description>Recent content in Blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/blog/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 存取外網與 VPC</title><link>https://pj-99.github.io/blog/aws/lambda/lambda_access_interent_and_vpc/</link><pubDate>Sun, 01 Dec 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/aws/lambda/lambda_access_interent_and_vpc/</guid><description>
-&lt;p>lambda 在 VPC 內不能直接對外連線，除非用 NAT 或給 lambda 網卡，但這些功能需要費用。&lt;/p>
-&lt;p>因此如果要在預算有限（&lt;del>或根本沒有預算&lt;/del>）的情況下讓 lambda 可以存取 VPC 內的資源（如 RDS）又和外網的伺服器溝通的話，是比較難直接做到的，但還是可以透過其他方法達成，例如分成 VPC 內的 lambda 以及外網的 lambda，再使用 lambda destination 連接兩者。&lt;/p>
-&lt;h2>Lambda destination&lt;span class="hx-absolute -hx-mt-20" id="lambda-destination">&lt;/span>
-&lt;a href="#lambda-destination" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;ul>
-&lt;li>&lt;a href="https://aws.amazon.com/tw/blogs/compute/introducing-aws-lambda-destinations/" target="_blank" rel="noopener">lambda destination&lt;/a> 可以讓指定這個 lambda 成功或失敗後要觸發什麼事
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Blog</title><link>https://pj-99.github.io/blog/</link><description>Recent content in Blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/blog/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 的網路能力和 Lambda 如何存取外網和 VPC</title><link>https://pj-99.github.io/blog/aws/lambda/lambda_access_internet_and_vpc/</link><pubDate>Wed, 08 Jan 2025 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/aws/lambda/lambda_access_internet_and_vpc/</guid><description>
+&lt;p>Lambda 的網路能力可以分為兩種，有連接到 VPC 或沒有。&lt;/p>
+&lt;p>最近做專案時，想嘗試用 Lambda 將第三方 API 回傳的資料存入 VPC 內的 RDS，但在過程中發現，在預設（沒有特別設定 NAT 等、沒有什麼預算）的情況下，無法直接讓一個 Lambda 同時存取外網服務又存取 VPC，經過一番掙扎，最後透過「將事情分給不同 Lambda 還有用 Lambda destination 傳資料」來解決這個問題。&lt;/p>
+&lt;p>這篇會先簡單介紹 AWS Lambda 的網路能力，再介紹 Lambda 存取外網和 VPC 的一種方法。&lt;/p>
+&lt;h2>AWS Lambda 的網路能力: attach-VPC or no-VPC&lt;span class="hx-absolute -hx-mt-20" id="aws-lambda-的網路能力-attach-vpc-or-no-vpc">&lt;/span>
+&lt;a href="#aws-lambda-%e7%9a%84%e7%b6%b2%e8%b7%af%e8%83%bd%e5%8a%9b-attach-vpc-or-no-vpc" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>在設定 Lambda 時，有個選項是 &lt;code>Enable VPC&lt;/code>，打開之後就可以選要讓 Lambda 連接到哪個 VPC，透過這個設定就能讓 Lambda 存取到 VPC 內的資源。
+&lt;img src="https://pj-99.github.io/attachments/VPC_internet_lambda_enable_VPC.png" alt="" loading="lazy" />
+一開始在趕著實作出專案功能時，還以為把這個 &lt;code>Enable VPC&lt;/code> 勾勾起來，就像是把 Lambda 放在 VPC 內，後來看到官方資料與其他大大的整理，才發現其實背後發生的事情並不是想像的這樣，能夠存取 VPC 的 Lambda 沒有真的放在 VPC 內，而是它可以&lt;strong>連接到 VPC&lt;/strong> (attach-VPC)。&lt;/p>
+&lt;p>以下使用的示意圖來源為 &lt;a href="https://d1.awsstatic.com/events/reinvent/2020/AWS_Lambda_networking_best_practices_SVS312.pdf" target="_blank" rel="noopener">AWS re:Invent 2020 AWS Lambda networking best practices&lt;/a>，裡面有許多關於 Lambda networking 詳盡且附圖的介紹，推推。&lt;/p>
+&lt;p>首先需要知道的背景知識是，所有的 Lambda 都被放在 AWS 管理的 Lambda service VPC 中執行，呼叫 Lambda 都是統一透過 Lambda service API：
+&lt;img src="https://pj-99.github.io/attachments/Lambda_services_VPC.png" alt="Lambda Services VPC" width="300">&lt;/p>
+&lt;p>而 Lambda 的網路連線能力分為兩種，如下面這張圖的 no-VPC 或是連接 VPC。&lt;/p>
+&lt;img src="https://pj-99.github.io/attachments/Lambda_networking_modes.png">
+&lt;p>預設的 no-VPC 模式讓 Lambda 可以存取網際網路上的東西，不能存取 VPC 的資源（畢竟是 Virtual &lt;strong>private&lt;/strong> cloud）。&lt;/p>
+&lt;p>而將 &lt;code>Enable VPC&lt;/code> 模式打勾後，Lambda 還是會被放在 Lambda service VPC 裡，但是這個 Lambda 的所有網路流量都會被導到選擇的 VPC，也因此如果 VPC 沒有特別設定（像是 NAT 等等），那麼這個 Lambda 是不能跟外網資源溝通的。&lt;/p>
 &lt;ul>
-&lt;li>可觸發的功能包含： AWS SNS, SQS, lambda, Eventbridge 等等。&lt;/li>
-&lt;li>比較特別的是 lambda 的呼叫方式有分 sync 和 async，&lt;strong>只有 async 呼叫方式會觸發 lambda destination&lt;/strong>
+&lt;li>中間發生了什麼事情可以看 &lt;a href="https://d1.awsstatic.com/events/reinvent/2020/AWS_Lambda_networking_best_practices_SVS312.pdf" target="_blank" rel="noopener">AWS Lambda networking best practices&lt;/a> 的詳盡介紹&lt;/li>
+&lt;/ul>
+&lt;h2>AWS Lambda 如何存取外網和 VPC&lt;span class="hx-absolute -hx-mt-20" id="aws-lambda-如何存取外網和-vpc">&lt;/span>
+&lt;a href="#aws-lambda-%e5%a6%82%e4%bd%95%e5%ad%98%e5%8f%96%e5%a4%96%e7%b6%b2%e5%92%8c-vpc" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>那麼沒有預算可以開 NAT 的情況下，該怎麼做才能讓 Lambda 可以存取外網、又存取 VPC 呢？&lt;/p>
+&lt;p>Google 了一陣子，從一位大大分享的 &lt;a href="https://3lexw.medium.com/aws-%E6%9C%AD%E8%A8%98-3-%E5%88%A9%E7%94%A8-aws-s3-%E4%BD%9C%E7%82%BA-aws-lambda-%E5%87%BD%E6%95%B8%E4%B9%8B%E9%96%93%E7%9A%84%E4%B8%AD%E8%BD%89%E7%AB%99-982d40e6e20f" target="_blank" rel="noopener">AWS Lambda 做網路爬蟲&lt;/a>的文章認識到 Lambda destination 可以用來傳遞 Lambda 之間的資料，也看到可以將 Lambda 打外網的結果存在 s3 上，再用另一個 Lambda 從 s3 讀檔做進一步處理。&lt;/p>
+&lt;p>從這流程學到一種做法是：不要只侷限一個 Lambda，中間的資料傳過去就好。美其名還可以視作「解耦 Lambda」😼&lt;/p>
+&lt;p>回到要將外網資料存回 RDS 的目標，我將「存取網路資料」與「寫入 DB 」分開：存取外網的事給 no-VPC 的 Lambda 做，寫 DB 的事就給 VPC 的 Lambda 做，也用 s3 來儲存中間產物。&lt;/p>
+&lt;p>但跟上面文章不一樣的是，我不是設定 s3 會 trigger 第二個 Lambda，而是讓第一個 Lambda 透過 Lambda destination 觸發第二個 Lambda，第二個 Lambda 再主動從 s3 下載檔案。&lt;/p>
+&lt;p>這樣的做法需要額外設定 VPC 的 s3 &lt;a href="https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html" target="_blank" rel="noopener">gateway endpoint&lt;/a>，讓 VPC 的網路流量不用經過外網再到 s3，而是透過 gateway endpoint 直接傳到 s3。&lt;/p>
 &lt;ul>
-&lt;li>例如：
+&lt;li>s3 和 dynamo DB 是 AWS 服務中少數可以免費在 VPC 中使用 gateway endpoint 的服務。&lt;/li>
+&lt;/ul>
+&lt;p>整體流程如下圖，&lt;del>想不太起來自己為什麼這樣做而不是像上面文章直接從 s3 trigger&lt;/del>&lt;/p>
+&lt;img src="https://pj-99.github.io/attachments/VPC_internet_lambda_s3.png" width="500">
+&lt;p>總之這個流程是可以正常運作的，但是後來考量到我們專案的需求，這條流程每 10 分鐘就會被觸發一次，一個月就會 PUT 4300 多次，因此這樣會用光免費方案提供的一個月 2000 次的 PUT，不是個適合沒有什麼預算的方法。&lt;/p>
+&lt;p>於是經過研究，又調整了一下流程，直接用 &lt;strong>Lambda destination&lt;/strong> 這個功能來傳中間產物。&lt;/p>
+&lt;h2>Lambda destination: 將 Lambda 結果傳下去&lt;span class="hx-absolute -hx-mt-20" id="lambda-destination-將-lambda-結果傳下去">&lt;/span>
+&lt;a href="#lambda-destination-%e5%b0%87-lambda-%e7%b5%90%e6%9e%9c%e5%82%b3%e4%b8%8b%e5%8e%bb" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>Lambda destination 可以將 Lambda 的執行結果傳遞給另一個服務，還可以設定當成功再傳或是失敗時再傳，目前可以傳遞的目標服務包含：SNS, SQS, Lambda, EventBridge。&lt;/p>
+&lt;p>舉例來說，你可以設定某個要監控的 A Lambda 有一條 on Failure 的 destination 到另一個通知用的 Lambda，若 A Lambda 某天執行失敗，就會將失敗的結果傳遞給會發通知的 Lambda。&lt;/p>
+&lt;p>但使用 Lambda destination 時要注意：&lt;/p>
 &lt;ul>
-&lt;li>在 AWS console 用 test 戳它是 sync，所以不會觸發 lambda destination。&lt;/li>
-&lt;li>被 EventBridge 的 event 觸發是 async。&lt;/li>
+&lt;li>Lambda 的呼叫方式有分 sync 和 async，可以用「需不需要立刻得到回傳值」來判斷是哪種，&lt;strong>只有 async 呼叫方式會觸發 lambda destination&lt;/strong>，所觸發的另一個 lambda 也是 async 呼叫。
+&lt;ul>
+&lt;li>例如，在 AWS console 用 test 戳它是 sync，所以不會觸發 lambda destination。被 EventBridge 的 event 觸發則是 async。&lt;/li>
+&lt;li>詳細可以參考這群大大的整理: &lt;a href="https://www.trek10.com/blog/lambda-destinations-what-we-learned-the-hard-way" target="_blank" rel="noopener">lambda-destinations-what-we-learned-the-hard-way&lt;/a>&lt;/li>
 &lt;/ul>
 &lt;/li>
+&lt;li>如果目標服務是另一個 Lambda，那 payload 就會受限於 &lt;a href="https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html" target="_blank" rel="noopener">Lambda async invocation payload 的限制&lt;/a>，&lt;strong>payload 上限只有 256 KB&lt;/strong>。&lt;/li>
 &lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;h3>Lambda 存取外網和 VPC 的一種 workaround&lt;span class="hx-absolute -hx-mt-20" id="lambda-存取外網和-vpc-的一種-workaround">&lt;/span>
-&lt;a href="#lambda-%e5%ad%98%e5%8f%96%e5%a4%96%e7%b6%b2%e5%92%8c-vpc-%e7%9a%84%e4%b8%80%e7%a8%ae-workaround" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;ol>
-&lt;li>用兩個 lambda，一個 lambda 做 public 的事情，另一個 lambda 做 VPC 的事情&lt;/li>
-&lt;li>根據需求連接 lambda（傳遞資料）
-&lt;ul>
-&lt;li>可連接的方式：s3, lambda destination, dynamoDB 等等&lt;/li>
-&lt;li>s3 和 dynamoDB 是少數 VPC 內可以（免費）存取的 AWS 服務，但仍要設定 gateway endpint，讓 VPC 可以透過 gateway endpoint 存取這些 AWS 資源，例如如果使用 AWS CDK ，需要讓 VPC 存取 s3 時要新增的部分：&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ol>
-&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
-&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-typescript" data-lang="typescript">&lt;span class="line">&lt;span class="cl">&lt;span class="nx">vpc&lt;/span>&lt;span class="p">.&lt;/span>&lt;span class="nx">addGatewayEndpoint&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;S3Gateway&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="p">{&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nx">service&lt;/span>: &lt;span class="kt">ec2.GatewayVpcEndpointAwsService.S3&lt;/span>&lt;span class="p">,&lt;/span>
-&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">});&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
-&lt;button
-class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
-title="Copy code"
->
-&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
-&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
-&lt;/button>
-&lt;/div>
-&lt;/div>
-&lt;p>以需要「打第三方 API 並放到 VPC 內的資料庫」為例：&lt;/p>
-&lt;ul>
-&lt;li>用 s3 連接：
-&lt;ul>
-&lt;li>public lambda 打第三方 API，將打完拿到的資料存到 s3，並設定 VPC lambda 會，VPC lambda 再從 s3 抓下來。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;li>用 lambda destination 的 response 與 event 連接:
-&lt;ul>
-&lt;li>public lambda 打第三方 API，將資料放於 response，設定 destination 為 VPC lambda，VPC lambda 就能從 event 中取得需要的資訊&lt;/li>
-&lt;li>另外，lambda input event 有長度限制，太長可以透過 gzip 等等方式壓縮。&lt;/li>
-&lt;/ul>
-&lt;/li>
-&lt;/ul>
-&lt;hr>
-&lt;p>至於如何選擇連接 lambda 的方式，可以考量資料量、呼叫頻率等等。&lt;/p>
-&lt;p>如果傳遞的資料量不太會太大，lambda destination 直接串接 lambda 們是比較簡單的方式，相較之下，如果檔案比較大，也許 s3 就比較適合。&lt;/p>
-&lt;p>此外， s3 目前的免費額度是一個月兩千次 PUT，如果 lambda 會頻繁地呼叫，可能也不太適合使用 s3。&lt;/p></description></item><item><title>Git - How to merge two repositories into one using git subtree add</title><link>https://pj-99.github.io/blog/git/merge_two_repos/</link><pubDate>Mon, 30 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/git/merge_two_repos/</guid><description>
+&lt;p>為了讓 payload 不要太大，可以壓縮資料。&lt;/p>
+&lt;p>像是我們專案使用了 gzip 來壓縮，例如原本的 JSON 是 279 KB ，透過 gzip 壓縮，可以降低到 19 KB。&lt;/p>
+&lt;p>最終實作的流程其實很簡單，如下圖：no-VPC Lambda 先打外網，將資料壓縮並回傳，再透過 Lambda destination 將資料傳遞給 VPC Lambda，最後再與 VPC 內的資源溝通。&lt;/p>
+&lt;img src="https://pj-99.github.io/attachments/VPC_internet_lambda_destination.png" width="500">
+&lt;h2>小結&lt;span class="hx-absolute -hx-mt-20" id="小結">&lt;/span>
+&lt;a href="#%e5%b0%8f%e7%b5%90" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>網路上還有許多關於這個問題的豐富討論與方法比較，這篇提到的只是其中一種做法，像是如果你要存取外網只是為了用 AWS 本身服務的話，那很高機率會有其他更適合的方法。&lt;/p>
+&lt;p>但如果你的需求和這篇描述的情境類似，是 async 觸發的、要存取第三方服務、資料不大，那拆分成兩個 Lambda 並透過 destination 傳遞或許是個簡單的選擇。&lt;/p>
+&lt;h2>References&lt;span class="hx-absolute -hx-mt-20" id="references">&lt;/span>
+&lt;a href="#references" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;ul>
+&lt;li>&lt;a href="https://d1.awsstatic.com/events/reinvent/2020/AWS_Lambda_networking_best_practices_SVS312.pdf" target="_blank" rel="noopener">https://d1.awsstatic.com/events/reinvent/2020/AWS_Lambda_networking_best_practices_SVS312.pdf&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://stackoverflow.com/questions/52992085/why-cant-an-aws-lambda-function-inside-a-public-subnet-in-a-vpc-connect-to-the" target="_blank" rel="noopener">https://stackoverflow.com/questions/52992085/why-cant-an-aws-lambda-function-inside-a-public-subnet-in-a-vpc-connect-to-the&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://medium.com/@arunasilva86/how-to-use-vpc-networking-effectively-for-lambda-445abefdf8cf" target="_blank" rel="noopener">https://medium.com/@arunasilva86/how-to-use-vpc-networking-effectively-for-lambda-445abefdf8cf&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://aws.amazon.com/tw/blogs/compute/announcing-improved-vpc-networking-for-aws-lambda-functions/" target="_blank" rel="noopener">https://aws.amazon.com/tw/blogs/compute/announcing-improved-vpc-networking-for-aws-lambda-functions/&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://aws.amazon.com/tw/blogs/compute/using-aws-lambda-iam-condition-keys-for-vpc-settings/" target="_blank" rel="noopener">https://aws.amazon.com/tw/blogs/compute/using-aws-lambda-iam-condition-keys-for-vpc-settings/&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://3lexw.medium.com/aws-%E6%9C%AD%E8%A8%98-3-%E5%88%A9%E7%94%A8-aws-s3-%E4%BD%9C%E7%82%BA-aws-lambda-%E5%87%BD%E6%95%B8%E4%B9%8B%E9%96%93%E7%9A%84%E4%B8%AD%E8%BD%89%E7%AB%99-982d40e6e20f" target="_blank" rel="noopener">https://3lexw.medium.com/aws-%E6%9C%AD%E8%A8%98-3-%E5%88%A9%E7%94%A8-aws-s3-%E4%BD%9C%E7%82%BA-aws-lambda-%E5%87%BD%E6%95%B8%E4%B9%8B%E9%96%93%E7%9A%84%E4%B8%AD%E8%BD%89%E7%AB%99-982d40e6e20f&lt;/a>&lt;/li>
+&lt;/ul></description></item><item><title>Git - How to merge two repositories into one using git subtree add</title><link>https://pj-99.github.io/blog/git/merge_two_repos/</link><pubDate>Mon, 30 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/git/merge_two_repos/</guid><description>
 &lt;h2>How to merge two repositories into one&lt;span class="hx-absolute -hx-mt-20" id="how-to-merge-two-repositories-into-one">&lt;/span>
 &lt;a href="#how-to-merge-two-repositories-into-one" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>例如你已經開發一個 web 一段時間，有一個 backend 的 repo 和一個 frontend 的 repo，現在想要將它們合併成一個 repo，又不想完全失去之前的歷史記錄，就可以用 &lt;code>git subtree add&lt;/code> 加入指定 repo 的 commit tree。&lt;/p>
 &lt;h2>git subtree add&lt;span class="hx-absolute -hx-mt-20" id="git-subtree-add">&lt;/span>
