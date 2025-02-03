@@ -1,4 +1,4 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Blog</title><link>https://pj-99.github.io/blog/</link><description>Recent content in Blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/blog/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 的網路能力和 Lambda 如何存取外網和 VPC</title><link>https://pj-99.github.io/blog/aws/lambda/lambda_access_internet_and_vpc/</link><pubDate>Wed, 08 Jan 2025 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/aws/lambda/lambda_access_internet_and_vpc/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Blog</title><link>https://pj-99.github.io/blog/</link><description>Recent content in Blog on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pj-99.github.io/blog/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 的網路能力：如何存取外網和 VPC</title><link>https://pj-99.github.io/blog/aws/lambda/lambda_access_internet_and_vpc/</link><pubDate>Wed, 08 Jan 2025 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/aws/lambda/lambda_access_internet_and_vpc/</guid><description>
 &lt;p>Lambda 的網路能力可以分為兩種，有連接到 VPC 或沒有。&lt;/p>
 &lt;p>最近做專案時，想嘗試用 Lambda 將第三方 API 回傳的資料存入 VPC 內的 RDS，但在過程中發現，在預設（沒有特別設定 NAT 等、沒有什麼預算）的情況下，無法直接讓一個 Lambda 同時存取外網服務又存取 VPC，經過一番掙扎，最後透過「將事情分給不同 Lambda 還有用 Lambda destination 傳資料」來解決這個問題。&lt;/p>
 &lt;p>這篇會先簡單介紹 AWS Lambda 的網路能力，再介紹 Lambda 存取外網和 VPC 的一種方法。&lt;/p>
@@ -226,4 +226,517 @@ title="Copy code"
 &lt;a href="#refs" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;ul>
 &lt;li>&lt;a href="https://go.dev/tour/concurrency/2" target="_blank" rel="noopener">A Tour of Go&lt;/a>&lt;/li>
 &lt;li>&lt;a href="https://draveness.me/golang/docs/part2-foundation/ch05-keyword/golang-select/" target="_blank" rel="noopener">Go 语言 select 的实现原理 | Go 语言设计与实现 (draveness.me)&lt;/a>&lt;/li>
+&lt;/ul></description></item><item><title>Git objects: blob, tree, commit</title><link>https://pj-99.github.io/blog/git/git_objects/</link><pubDate>Sun, 15 Sep 2024 00:00:00 +0000</pubDate><guid>https://pj-99.github.io/blog/git/git_objects/</guid><description>
+&lt;h1>Git internal: Git objects&lt;/h1>&lt;h2>前言&lt;span class="hx-absolute -hx-mt-20" id="前言">&lt;/span>
+&lt;a href="#%e5%89%8d%e8%a8%80" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>這份筆記的誕生源自於小賴老師的雲端原生課的作業，算是自己的少數筆記中少數比較完整的一篇，藉這個契機記錄下來，本篇內容大部分都是參考： &lt;a href="https://git-scm.com/book/en/v2/Git-Internals-Git-Objects" target="_blank" rel="noopener">Git - Git Objects (git-scm.com)&lt;/a> ，可以參考裡頭有許多詳盡的介紹。&lt;/p>
+&lt;h2>Git: key-value data store&lt;span class="hx-absolute -hx-mt-20" id="git-key-value-data-store">&lt;/span>
+&lt;a href="#git-key-value-data-store" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>Git 以版本控制為主要功能， 而它的內部是基於 key-value data store，你可以將任何 value 存進這個 data store 中，並得到一個用來取出它的 key，透過這個 data store，就能存取各種檔案的 snapshot。&lt;/p>
+&lt;p>除了這個 data store 外，git 也儲存了方便管理 key 的資訊（例如 branch, head 等等）。&lt;/p>
+&lt;p>一個 repo 的檔案結構：&lt;/p>
+&lt;ul>
+&lt;li>用 &lt;code>git init&lt;/code> 後，repo 內就會建立 &lt;code>.git&lt;/code> 資料夾，裡面儲存了所有這個 repo 中 git 需要的資料。&lt;/li>
+&lt;li>而在 &lt;code>.git&lt;/code> 資料夾中：
+&lt;ul>
+&lt;li>&lt;code>objects&lt;/code> 負責儲存 git objects: blob, tree, commit&lt;/li>
+&lt;li>&lt;code>refs&lt;/code> 負責儲存 references: branch, head, tag&lt;/li>
+&lt;li>&lt;code>index&lt;/code>負責處理 staging area 和 working directory&lt;/li>
+&lt;/ul>
+&lt;/li>
+&lt;/ul>
+&lt;h2>Git objects&lt;span class="hx-absolute -hx-mt-20" id="git-objects">&lt;/span>
+&lt;a href="#git-objects" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;h4>blob&lt;span class="hx-absolute -hx-mt-20" id="blob">&lt;/span>
+&lt;a href="#blob" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>git 提供了一些底層指令讓使用者能直接操作較底層的功能。&lt;code>git hash-object&lt;/code> 能依照輸入資料（value）產生對應的 unique key，並將資料儲存到 &lt;code>.git/objects&lt;/code> 目錄中，之後就能用 key 取資料。 &lt;strong>blob 就是最基本儲存物件類型，就是個值（例如一個檔案的內容）。&lt;/strong>&lt;/p>
+&lt;p>在用 &lt;code>git init&lt;/code> 建立 repo 後，一開始 &lt;code>.git/objects&lt;/code> 內只有 info 和 pack 資料夾。&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; tree .git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── info
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">└── pack&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>接著用&lt;code> git hash-object&lt;/code> 隨意存入某個東西：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; &lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;hello&amp;#39;&lt;/span> &lt;span class="p">|&lt;/span> git hash-object -w --stdin
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">ce013625030ba8dba906f756967f9e9ca394464a&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;ul>
+&lt;li>&lt;code>--stdin&lt;/code> 指定從終端機接受輸入（否則要指定要寫入的檔案）&lt;/li>
+&lt;li>&lt;code>-w&lt;/code> 寫入 object database（否則不會寫入，只會回傳 key ）&lt;/li>
+&lt;/ul>
+&lt;p>往後就可以用回傳的 key 拿到剛剛存進的內容。&lt;/p>
+&lt;div class="hx-overflow-x-auto hx-mt-6 hx-flex hx-flex-col hx-rounded-lg hx-border hx-py-4 hx-px-4 contrast-more:hx-border-current contrast-more:dark:hx-border-current hx-border-blue-200 hx-bg-blue-100 hx-text-blue-900 dark:hx-border-blue-200/30 dark:hx-bg-blue-900/30 dark:hx-text-blue-200">
+&lt;p class="hx-flex hx-items-center hx-font-medium">&lt;svg height=16px class="hx-inline-block hx-align-middle hx-mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">&lt;path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>&lt;/svg>Note&lt;/p>
+&lt;div class="hx-w-full hx-min-w-0 hx-leading-7">
+&lt;div class="hx-mt-6 hx-leading-7 first:hx-mt-0">&lt;p>&lt;strong>Git object key&lt;/strong>: 在 git object data store 中，這些 object 的 key 是使用 SHA-1 去 hash 檔案內容與 header 所產生的，header 包含了git object 的類別與大小。&lt;/p>
+&lt;/div>
+&lt;/div>
+&lt;/div>
+&lt;p>再觀察 objects 目錄，發現多了一個目錄和檔案：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; tree .git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── ce
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">│ └── 013625030ba8dba906f756967f9e9ca394464a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── info
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">└── pack&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>可以發現目錄名（前兩碼）加上檔案名就是剛剛所拿到的 key。&lt;/p>
+&lt;p>在 &lt;code>objects&lt;/code> 目錄中，每一個被儲存的東西都存在一個檔案中。檔案的目錄是 key 的前兩碼，檔案名則用剩下的部分。&lt;/p>
+&lt;p>ps. 好奇看一下這個檔案的內容，會看到一串亂碼：&lt;/p>
+&lt;blockquote>
+&lt;p>&lt;img src="https://github.com/pj-99/git-practice/raw/main/attachment/week-01/cat_object.png" alt="" loading="lazy" />
+（因為內容是壓縮過的）&lt;/p>
+&lt;/blockquote>
+&lt;p>使用用來觀察 git object 的 &lt;code>git cat-file&lt;/code> 去看檔案：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -p ce013625030ba8dba906f756967f9e9ca394464a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">hello&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;ul>
+&lt;li>&lt;code>-p&lt;/code>: pretty print the content&lt;/li>
+&lt;/ul>
+&lt;p>另外 &lt;code>git hash-object&lt;/code> （在不指定 &lt;code>--stdin&lt;/code> 時）可以計算檔案的&lt;strong>內容&lt;/strong>並產生 SHA-1 key：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; &lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;hello v1&amp;#39;&lt;/span> &amp;gt; test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git hash-object -w test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">d21fe316a0e9578aea75decc8c60e2a899534708&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>接下來如果修改了 test.txt，再存一次：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; &lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;hello v2&amp;#39;&lt;/span> &amp;gt; test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git hash-object -w test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">a9aa67508972702119f06b0de94cbdc45516c8e5&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>可以看到 objects 內部多了兩個檔案，特別的是，儲存時只管檔案的內容，不管檔名。&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; tree .git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── a9
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">│ └── aa67508972702119f06b0de94cbdc45516c8e5
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── ce
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">│ └── 013625030ba8dba906f756967f9e9ca394464a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── d2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">│ └── 1fe316a0e9578aea75decc8c60e2a899534708
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── info
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">└── pack&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>這些被存起來的內容，在 git 內部系統就叫做 blob，可以用&lt;code>git cat-file -t&lt;/code> 觀察 object 的 type 為 blob。&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -t d21fe316a0e9578aea75decc8c60e2a899534708
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">blob&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;div class="hx-overflow-x-auto hx-mt-6 hx-flex hx-flex-col hx-rounded-lg hx-border hx-py-4 hx-px-4 contrast-more:hx-border-current contrast-more:dark:hx-border-current hx-border-blue-200 hx-bg-blue-100 hx-text-blue-900 dark:hx-border-blue-200/30 dark:hx-bg-blue-900/30 dark:hx-text-blue-200">
+&lt;p class="hx-flex hx-items-center hx-font-medium">&lt;svg height=16px class="hx-inline-block hx-align-middle hx-mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">&lt;path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>&lt;/svg>Note&lt;/p>
+&lt;div class="hx-w-full hx-min-w-0 hx-leading-7">
+&lt;div class="hx-mt-6 hx-leading-7 first:hx-mt-0">&lt;p>&lt;strong>git add 與 blob&lt;/strong>:
+平常 &lt;code>git add&lt;/code> 會將檔案的 snapshot 存到 staging area。所以 &lt;code>git add&lt;/code> 後會產生新的 blob，並且 index(staging area) 也會被更新：&lt;/p>
+&lt;ol>
+&lt;li>在空的 repo 中，創一個內容為 hi.txt 並 git add hi.txt 後&lt;/li>
+&lt;li>可以發現 &lt;code>.git/objects&lt;/code> 只中出現一個新的 object，觀察看看：&lt;/li>
+&lt;/ol>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; tree .git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── &lt;span class="m">97&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">│ └── 3748e43cf176ae7bf8f6619f4b2a1c06c4b86a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── info
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">└── pack
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">4&lt;/span> directories, &lt;span class="m">1&lt;/span> file
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -p 973748e43cf176ae7bf8f6619f4b2a1c06c4b86a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">hihi%
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -t 973748e43cf176ae7bf8f6619f4b2a1c06c4b86a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">blob&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;ol start="3">
+&lt;li>至於 index (staging area) 的檔案資訊被存在 &lt;code>.git/index&lt;/code> 中 (&lt;a href="https://stackoverflow.com/questions/4084921/what-does-the-git-index-contain-exactly" target="_blank" rel="noopener">refs&lt;/a>)：&lt;/li>
+&lt;/ol>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git ls-files --stage
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> 973748e43cf176ae7bf8f6619f4b2a1c06c4b86a &lt;span class="m">0&lt;/span> hi.txt&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;/div>
+&lt;/div>
+&lt;/div>
+&lt;p>即便能把內容存起來，但這些都只有「檔案」的內容，沒有對應檔名，還不足以完成版本控制需要追蹤每個「檔案」的，要追蹤檔案，還需要 tree。&lt;/p>
+&lt;hr>
+&lt;h3>tree&lt;span class="hx-absolute -hx-mt-20" id="tree">&lt;/span>
+&lt;a href="#tree" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>在 Git 的 key-value data store 中，被儲存的內容主要為 tree 和 blob。
+&lt;strong>tree 可以想像成目錄，目錄可以包含子目錄與檔案。&lt;/strong>
+blob 只有內容，而在 tree 裡有了檔案名稱，因此 tree 與 blob 合作成為一個完整的檔案們（有檔名也有檔案內容）。&lt;/p>
+&lt;p>每個 tree 包含 entries，一個 entry 可能是 tree 或 blob，每個 entry 同時有它的 path，type，還有 SHA-1 key（指向對應的 blob 或是 tree），tree 看起來像這樣：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">$ git cat-file -p master^&lt;span class="o">{&lt;/span>tree&lt;span class="o">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> blob a906cb2a4a904a152e80877d4088654daad0c859 README
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> blob 8f94139338f9404f26296befa88755fc2598c289 Rakefile
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">040000&lt;/span> tree 99f1a6d12cb4b6f19c8655fca46c3ecf317074e0 lib&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h4>建立 tree&lt;span class="hx-absolute -hx-mt-20" id="建立-tree">&lt;/span>
+&lt;a href="#%e5%bb%ba%e7%ab%8b-tree" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>git 能將你的 staging area (index) 創成一個 tree。為了手動建立一個 tree，要先讓 staging area 有東西。&lt;/p>
+&lt;p>&lt;code>git update-index&lt;/code> 可以將檔案內容註冊到 index (staging area) 中。&lt;/p>
+&lt;p>把第一版的 test.txt （存在 objects data store 中的第一版內容）加到 staging area：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">git update-index --add --cacheinfo &lt;span class="m">100644&lt;/span> d21fe316a0e9578aea75decc8c60e2a899534708 test.txt&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;ul>
+&lt;li>&lt;code>--add&lt;/code>: 因為原本 staging area 沒有 test.txt，要 add 進去。&lt;/li>
+&lt;li>&lt;code>--cacheinfo &amp;lt;mode&amp;gt; &amp;lt;object&amp;gt; &amp;lt;path&amp;gt;&lt;/code> : 可以將不在 working directory 的檔案註冊到 index，直接將指定的資訊輸入到 index 中，這裡指定將 d21fe3 物件內容 (第一版的 test.txt) 以 test.txt 放入 index。mode 是指檔案模式：一般檔案、執行檔等等）&lt;/li>
+&lt;/ul>
+&lt;p>於是 staging 中出現了第一版 test.txt：&lt;/p>
+&lt;p>&lt;img src="https://github.com/pj-99/git-practice/blob/main/attachment/week-01/staged.png?raw=true" alt="" loading="lazy" />&lt;/p>
+&lt;p>再來就能將 staging area 以 tree 存起來：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git write-tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">6a48d63e943686e85ea53e723d0777891369db15&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>看一下這個 tree，包含了 test.txt 檔案和它的資訊：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -p 6a48d63e943686e85ea53e723d0777891369db15
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> blob d21fe316a0e9578aea75decc8c60e2a899534708 test.txt&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>再創一個 tree，這次改用一個第二版 test.txt 和一個新檔案&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git update-index --cacheinfo &lt;span class="m">100644&lt;/span> a9aa67508972702119f06b0de94cbdc45516c8e5 test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; &lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;new file&amp;#39;&lt;/span> &amp;gt; new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git update-index --add new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git write-tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">dbb963c9308e5f11a30f661f22476e0ab41a0817
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -p dbb963c9308e5f11a30f661f22476e0ab41a0817
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> blob fa49b077972391ad58037050f2a75f74e3671e92 new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> blob a9aa67508972702119f06b0de94cbdc45516c8e5 test.txt&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>這個 tree 裡的 test.txt 的 SHA-1 key 用的就是第二版了。&lt;/p>
+&lt;p>還可以把 tree 讀出來放到 index 中，指定 &lt;code>--preifx&lt;/code> 設定 tree 要放到的 path，再寫一個新的 tree&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git read-tree --prefix&lt;span class="o">=&lt;/span>my_first_tree 6a48d63e943686e85ea53e723d0777891369db15
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git write-tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">762f698814999a48cdd3d50abfaca5aa6b76a222&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>觀察這個 tree，確實有一個 subtree 在 my_first_tree ：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -p 762f698814999a48cdd3d50abfaca5aa6b76a222
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">040000&lt;/span> tree dbb963c9308e5f11a30f661f22476e0ab41a0817 my_first_tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> blob fa49b077972391ad58037050f2a75f74e3671e92 new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="m">100644&lt;/span> blob a9aa67508972702119f06b0de94cbdc45516c8e5 test.txt&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h3>commit&lt;span class="hx-absolute -hx-mt-20" id="commit">&lt;/span>
+&lt;a href="#commit" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>現在 git 可以記住檔案內容、檔名、多個檔案了，但這些 SHA-1 key 怎麼管理，每次都要自己記下來？因此就需要 commit。commit 也是一個 git object，它儲存了對應的 tree 和訊息、時間、作者等等資訊。&lt;/p>
+&lt;h4>建立 commit tree&lt;span class="hx-absolute -hx-mt-20" id="建立-commit-tree">&lt;/span>
+&lt;a href="#%e5%bb%ba%e7%ab%8b-commit-tree" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>用第一個建立的 tree 創個 commit tree：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; &lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;First commit&amp;#39;&lt;/span> &lt;span class="p">|&lt;/span> git commit-tree 6a48d63e943686e85ea53e723d0777891369db15
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">4f2c2899185b2f29c111b5a1fa1ab99fe3b54613
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; git cat-file -p 4f2c2899185b2f29c111b5a1fa1ab99fe3b54613
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">tree 6a48d63e943686e85ea53e723d0777891369db15
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">author pj &amp;lt;Pinjiang1220@gmail.com&amp;gt; &lt;span class="m">1726329289&lt;/span> +0800
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">committer pj &amp;lt;Pinjiang1220@gmail.com&amp;gt; &lt;span class="m">1726329289&lt;/span> +0800
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">First commit&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>依序照剛剛之前 tree 建立的順序，建立對應的 commit，並以 &lt;code>-p&lt;/code> 指定該 commit 的 parent&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; &lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;Second commit&amp;#39;&lt;/span> &lt;span class="p">|&lt;/span> git commit-tree dbb963 -p 4f2c28
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">bc6aae4a51a38564a37b8421c76ddfc81b9dcb51
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; &lt;span class="nb">echo&lt;/span> &lt;span class="s1">&amp;#39;Third commit&amp;#39;&lt;/span> &lt;span class="p">|&lt;/span> git commit-tree 762f69 -p bc6aae
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">893046925efff5afa8b24d8d884a9bdd12ed2e08&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>看看最後的 commit：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">git log --stat 893046925efff5afa8b24d8d884a9bdd12ed2e08&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>&lt;img src="https://github.com/pj-99/git-practice/blob/main/attachment/week-01/commits.png?raw=true" alt="" loading="lazy" />&lt;/p>
+&lt;p>要注意的是，&lt;code>git commit-tree&lt;/code>和平常 &lt;code>git commit&lt;/code> 是不一樣的，&lt;code>git commit&lt;/code> 是&lt;strong>在目前的 branch 上&lt;/strong>做新的 commit，而這裡的 &lt;code>git commit-tree&lt;/code> 是做一個 commit object，並沒有關於 branch 的資訊。&lt;/p>
+&lt;hr>
+&lt;h2>Git references&lt;span class="hx-absolute -hx-mt-20" id="git-references">&lt;/span>
+&lt;a href="#git-references" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>在上一個章節，看 commit tree objects 時還是得用 SHA-1 去看，這不太方便，最好可以用個好記的別名 （reference）去代替 SHA-1，平常用的 branch 就算是一種 references，&lt;/p>
+&lt;p>references 被存在 &lt;code>refs&lt;/code> 目錄中，在沒有任何 &lt;code>git commit&lt;/code> 之前，refs 只有 heads 和 tags 資料夾。&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; tree .git/refs
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/refs
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── heads
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">└── tags&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h3>branch&lt;span class="hx-absolute -hx-mt-20" id="branch">&lt;/span>
+&lt;a href="#branch" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>branch 是一個指向某個 commit 的指標。&lt;/p>
+&lt;p>從剛才最後的 commit object 建立一個名為 hello 的 branch：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">git branch hello 893046925efff5afa8b24d8d884a9bdd12ed2e08&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>ps. 上面的指令等同於：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; cat .git/refs/heads/hello
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">893046925efff5afa8b24d8d884a9bdd12ed2e08&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>現在 &lt;code>refs/heads&lt;/code> 中多了 &lt;code>hello&lt;/code>，&lt;code>hello&lt;/code> 的內容是剛剛給的 commit 的 SHA-1。之後如果切到別的 branch，要回來 hello 這條 branch，git 就知道要切到哪個 commit 了。&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; tree .git/refs
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/refs
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">├── heads
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">│ └── hello
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">└── tags
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; cat .git/refs/heads/hello
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">893046925efff5afa8b24d8d884a9bdd12ed2e08&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h3>head&lt;span class="hx-absolute -hx-mt-20" id="head">&lt;/span>
+&lt;a href="#head" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>head 代表了目前在的 branch。head 通常是指向某個 reference，但有時會直接指向某個 git object 而不是 reference，這種時候就被稱為 &lt;code>DETACHED HEAD&lt;/code>。&lt;/p>
+&lt;p>head 所存的 refs 寫在 &lt;code>.git/head&lt;/code> 中，例如原本在 main branch：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; cat .git/HEAD
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">ref: refs/heads/main&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>切換到 hello branch：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git checkout hello
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Switched to branch &lt;span class="s1">&amp;#39;hello&amp;#39;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt; cat .git/HEAD
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">ref: refs/heads/hello&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>切換到某個 commit 而不是 branch，跳出來的 &lt;code>DETACHED HEAD&lt;/code> 警告在這之後做的變更不會影響到 branch：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-shell" data-lang="shell">&lt;span class="line">&lt;span class="cl">&amp;gt; git checkout bc6aae4a51a38564a37b8421c76ddfc81b9dcb51
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Note: switching to &lt;span class="s1">&amp;#39;bc6aae4a51a38564a37b8421c76ddfc81b9dcb51&amp;#39;&lt;/span>.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">You are in &lt;span class="s1">&amp;#39;detached HEAD&amp;#39;&lt;/span> state. You can look around, make experimental
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">changes and commit them, and you can discard any commits you make in this
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">state without impacting any branches by switching back to a branch.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">If you want to create a new branch to retain commits you create, you may
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">do&lt;/span> so &lt;span class="o">(&lt;/span>now or later&lt;span class="o">)&lt;/span> by using -c with the switch command. Example:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> git switch -c &amp;lt;new-branch-name&amp;gt;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Or undo this operation with:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> git switch -
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Turn off this advice by setting config variable advice.detachedHead to &lt;span class="nb">false&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">HEAD is now at bc6aae4 Second commit&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h2>Ref&lt;span class="hx-absolute -hx-mt-20" id="ref">&lt;/span>
+&lt;a href="#ref" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;ul>
+&lt;li>&lt;a href="https://git-scm.com/book/en/v2/Git-Internals-Plumbing-and-Porcelain" target="_blank" rel="noopener">Git - Plumbing and Porcelain (git-scm.com)&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://git-scm.com/book/en/v2/Git-Internals-Git-References" target="_blank" rel="noopener">Git - Git References (git-scm.com)&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://git-scm.com/book/en/v2/Git-Internals-Git-Objects" target="_blank" rel="noopener">Git - Git Objects (git-scm.com)&lt;/a>&lt;/li>
+&lt;li>&lt;a href="https://stackoverflow.com/questions/4084921/what-does-the-git-index-contain-exactly" target="_blank" rel="noopener">internals - What does the git index contain EXACTLY? - Stack Overflow&lt;/a>&lt;/li>
 &lt;/ul></description></item></channel></rss>
