@@ -1,5 +1,4 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog –</title><link>https://pjdev.me/</link><description>Recent content on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pjdev.me/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 的網路能力：如何存取外網和 VPC</title><link>https://pjdev.me/blog/aws/lambda/lambda_access_internet_and_vpc/</link><pubDate>Wed, 08 Jan 2025 00:00:00 +0000</pubDate><guid>https://pjdev.me/blog/aws/lambda/lambda_access_internet_and_vpc/</guid><description>
-&lt;p>Lambda 的網路能力可以分為兩種，有連接到 VPC 或沒有。&lt;/p>
 &lt;p>最近做專案時，想嘗試用 Lambda 將第三方 API 回傳的資料存入 VPC 內的 RDS，但在過程中發現，在預設（沒有特別設定 NAT 等、沒有什麼預算）的情況下，無法直接讓一個 Lambda 同時存取外網服務又存取 VPC，經過一番掙扎，最後透過「將事情分給不同 Lambda 還有用 Lambda destination 傳資料」來解決這個問題。&lt;/p>
 &lt;p>這篇會先簡單介紹 AWS Lambda 的網路能力，再介紹 Lambda 存取外網和 VPC 的一種方法。&lt;/p>
 &lt;h2>AWS Lambda 的網路能力: attach-VPC or no-VPC&lt;span class="hx-absolute -hx-mt-20" id="aws-lambda-的網路能力-attach-vpc-or-no-vpc">&lt;/span>
