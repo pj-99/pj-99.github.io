@@ -1,15 +1,15 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – AWS</title><link>https://pjdev.me/tags/aws/</link><description>Recent content in AWS on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><lastBuildDate>Wed, 08 Jan 2025 00:00:00 +0000</lastBuildDate><atom:link href="https://pjdev.me/tags/aws/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 的網路能力：如何存取外網和 VPC</title><link>https://pjdev.me/blog/aws/lambda/lambda_access_internet_and_vpc/</link><pubDate>Wed, 08 Jan 2025 00:00:00 +0000</pubDate><guid>https://pjdev.me/blog/aws/lambda/lambda_access_internet_and_vpc/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – AWS</title><link>https://pjfordev.com/tags/aws/</link><description>Recent content in AWS on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><lastBuildDate>Wed, 08 Jan 2025 00:00:00 +0000</lastBuildDate><atom:link href="https://pjfordev.com/tags/aws/index.xml" rel="self" type="application/rss+xml"/><item><title>AWS Lambda 的網路能力：如何存取外網和 VPC</title><link>https://pjfordev.com/blog/aws/lambda/lambda_access_internet_and_vpc/</link><pubDate>Wed, 08 Jan 2025 00:00:00 +0000</pubDate><guid>https://pjfordev.com/blog/aws/lambda/lambda_access_internet_and_vpc/</guid><description>
 &lt;p>最近做專案時，想嘗試用 Lambda 將第三方 API 回傳的資料存入 VPC 內的 RDS，但在過程中發現，在預設（沒有特別設定 NAT 等、沒有什麼預算）的情況下，無法直接讓一個 Lambda 同時存取外網服務又存取 VPC，經過一番掙扎，最後透過「將事情分給不同 Lambda 還有用 Lambda destination 傳資料」來解決這個問題。&lt;/p>
 &lt;p>這篇會先簡單介紹 AWS Lambda 的網路能力，再介紹 Lambda 存取外網和 VPC 的一種方法。&lt;/p>
 &lt;h2>AWS Lambda 的網路能力: attach-VPC or no-VPC&lt;span class="hx-absolute -hx-mt-20" id="aws-lambda-的網路能力-attach-vpc-or-no-vpc">&lt;/span>
 &lt;a href="#aws-lambda-%e7%9a%84%e7%b6%b2%e8%b7%af%e8%83%bd%e5%8a%9b-attach-vpc-or-no-vpc" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>在設定 Lambda 時，有個選項是 &lt;code>Enable VPC&lt;/code>，打開之後就可以選要讓 Lambda 連接到哪個 VPC，透過這個設定就能讓 Lambda 存取到 VPC 內的資源。
-&lt;img src="https://pjdev.me/attachments/VPC_internet_lambda_enable_VPC.png" alt="" loading="lazy" />
+&lt;img src="https://pjfordev.com/attachments/VPC_internet_lambda_enable_VPC.png" alt="" loading="lazy" />
 一開始在趕著實作出專案功能時，還以為把這個 &lt;code>Enable VPC&lt;/code> 勾勾起來，就像是把 Lambda 放在 VPC 內，後來看到官方資料與其他大大的整理，才發現其實背後發生的事情並不是想像的這樣，能夠存取 VPC 的 Lambda 沒有真的放在 VPC 內，而是它可以&lt;strong>連接到 VPC&lt;/strong> (attach-VPC)。&lt;/p>
 &lt;p>以下使用的示意圖來源為 &lt;a href="https://d1.awsstatic.com/events/reinvent/2020/AWS_Lambda_networking_best_practices_SVS312.pdf" target="_blank" rel="noopener">AWS re:Invent 2020 AWS Lambda networking best practices&lt;/a>，裡面有許多關於 Lambda networking 詳盡且附圖的介紹，推推。&lt;/p>
 &lt;p>首先需要知道的背景知識是，所有的 Lambda 都被放在 AWS 管理的 Lambda service VPC 中執行，呼叫 Lambda 都是統一透過 Lambda service API：
-&lt;img src="https://pjdev.me/attachments/Lambda_services_VPC.png" alt="Lambda Services VPC" width="300">&lt;/p>
+&lt;img src="https://pjfordev.com/attachments/Lambda_services_VPC.png" alt="Lambda Services VPC" width="300">&lt;/p>
 &lt;p>而 Lambda 的網路連線能力分為兩種，如下面這張圖的 no-VPC 或是連接 VPC。&lt;/p>
-&lt;img src="https://pjdev.me/attachments/Lambda_networking_modes.png">
+&lt;img src="https://pjfordev.com/attachments/Lambda_networking_modes.png">
 &lt;p>預設的 no-VPC 模式讓 Lambda 可以存取網際網路上的東西，不能存取 VPC 的資源（畢竟是 Virtual &lt;strong>private&lt;/strong> cloud）。&lt;/p>
 &lt;p>而將 &lt;code>Enable VPC&lt;/code> 模式打勾後，Lambda 還是會被放在 Lambda service VPC 裡，但是這個 Lambda 的所有網路流量都會被導到選擇的 VPC，也因此如果 VPC 沒有特別設定（像是 NAT 等等），那麼這個 Lambda 是不能跟外網資源溝通的。&lt;/p>
 &lt;ul>
@@ -26,7 +26,7 @@
 &lt;li>s3 和 dynamo DB 是 AWS 服務中少數可以免費在 VPC 中使用 gateway endpoint 的服務。&lt;/li>
 &lt;/ul>
 &lt;p>整體流程如下圖，&lt;del>想不太起來自己為什麼這樣做而不是像上面文章直接從 s3 trigger&lt;/del>&lt;/p>
-&lt;img src="https://pjdev.me/attachments/VPC_internet_lambda_s3.png" width="500">
+&lt;img src="https://pjfordev.com/attachments/VPC_internet_lambda_s3.png" width="500">
 &lt;p>總之這個流程是可以正常運作的，但是後來考量到我們專案的需求，這條流程每 10 分鐘就會被觸發一次，一個月就會 PUT 4300 多次，因此這樣會用光免費方案提供的一個月 2000 次的 PUT，不是個適合沒有什麼預算的方法。&lt;/p>
 &lt;p>於是經過研究，又調整了一下流程，直接用 &lt;strong>Lambda destination&lt;/strong> 這個功能來傳中間產物。&lt;/p>
 &lt;h2>Lambda destination: 將 Lambda 結果傳下去&lt;span class="hx-absolute -hx-mt-20" id="lambda-destination-將-lambda-結果傳下去">&lt;/span>
@@ -45,7 +45,7 @@
 &lt;p>為了讓 payload 不要太大，可以壓縮資料。&lt;/p>
 &lt;p>像是我們專案使用了 gzip 來壓縮，例如原本的 JSON 是 279 KB ，透過 gzip 壓縮，可以降低到 19 KB。&lt;/p>
 &lt;p>最終實作的流程其實很簡單，如下圖：no-VPC Lambda 先打外網，將資料壓縮並回傳，再透過 Lambda destination 將資料傳遞給 VPC Lambda，最後再與 VPC 內的資源溝通。&lt;/p>
-&lt;img src="https://pjdev.me/attachments/VPC_internet_lambda_destination.png" width="500">
+&lt;img src="https://pjfordev.com/attachments/VPC_internet_lambda_destination.png" width="500">
 &lt;h2>小結&lt;span class="hx-absolute -hx-mt-20" id="小結">&lt;/span>
 &lt;a href="#%e5%b0%8f%e7%b5%90" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>網路上還有許多關於這個問題的豐富討論與方法比較，這篇提到的只是其中一種做法，像是如果你要存取外網只是為了用 AWS 本身服務的話，那很高機率會有其他更適合的方法。&lt;/p>
 &lt;p>但如果你的需求和這篇描述的情境類似，是 async 觸發的、要存取第三方服務、資料不大，那拆分成兩個 Lambda 並透過 destination 傳遞或許是個簡單的選擇。&lt;/p>
