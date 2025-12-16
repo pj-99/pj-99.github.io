@@ -1,0 +1,182 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Python</title><link>https://pjfordev.com/notes/python/</link><description>Recent content in Python on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pjfordev.com/notes/python/index.xml" rel="self" type="application/rss+xml"/><item><title>Logging Practices: Exception Handling and Message Formatting</title><link>https://pjfordev.com/notes/python/logging_error/</link><pubDate>Mon, 16 Dec 2024 10:00:00 +0800</pubDate><guid>https://pjfordev.com/notes/python/logging_error/</guid><description>
+&lt;div class="hx-overflow-x-auto hx-mt-6 hx-flex hx-rounded-lg hx-border hx-py-2 ltr:hx-pr-4 rtl:hx-pl-4 contrast-more:hx-border-current contrast-more:dark:hx-border-current hx-border-orange-100 hx-bg-orange-50 hx-text-orange-800 dark:hx-border-orange-400/30 dark:hx-bg-orange-400/20 dark:hx-text-orange-300">
+&lt;div class="ltr:hx-pl-3 ltr:hx-pr-2 rtl:hx-pr-3 rtl:hx-pl-2">&lt;/div>
+&lt;div class="hx-w-full hx-min-w-0 hx-leading-7">
+&lt;div class="hx-mt-6 hx-leading-7 first:hx-mt-0">Some content was generated with the assistance of Gemini 3 and edited.
+If you notice any mistakes, I would really appreciate you letting me know.&lt;/div>
+&lt;/div>
+&lt;/div>
+&lt;p>Log 的目的是「讓你快速修復 Bug」，那麼如何寫出可以更快找到並修復錯誤的 Log？
+以下整理了幾個常見的 Logging Practice。（雖然是基於 Python，但概念上不同語言之間大多是通用的）&lt;/p>
+&lt;h2>Exception Handling&lt;span class="hx-absolute -hx-mt-20" id="exception-handling">&lt;/span>
+&lt;a href="#exception-handling" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>在 &lt;code>except&lt;/code> 區塊中，必須保留完整的錯誤堆疊（Stack Trace）。&lt;/p>
+&lt;h3>Do: &lt;code>logger.exception&lt;/code> to keep stack trace&lt;span class="hx-absolute -hx-mt-20" id="do-loggerexception-to-keep-stack-trace">&lt;/span>
+&lt;a href="#do-loggerexception-to-keep-stack-trace" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>在 &lt;code>try...except&lt;/code> 區塊內，建議使用 &lt;code>logger.exception(&amp;quot;Message&amp;quot;)&lt;/code>。&lt;/p>
+&lt;p>（它等同於 &lt;code>logger.error(..., exc_info=True)&lt;/code>，會自動將原本的 Traceback 附加在 Log 中。）&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">logging&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">logger&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">logging&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">getLogger&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="vm">__name__&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">try&lt;/span>&lt;span class="p">:&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">result&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">1&lt;/span> &lt;span class="o">/&lt;/span> &lt;span class="mi">0&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">except&lt;/span> &lt;span class="ne">ZeroDivisionError&lt;/span>&lt;span class="p">:&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1"># ✅ 正確：Log 會包含 &amp;#34;Traceback (most recent call last)...&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">logger&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">exception&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;Calculation failed&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h4>Don&amp;rsquo;t: Just using &lt;code>logger.error&lt;/code>&lt;span class="hx-absolute -hx-mt-20" id="dont-just-using-loggererror">&lt;/span>
+&lt;a href="#dont-just-using-loggererror" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>使用 &lt;code>logger.error&lt;/code> 只會印出你的訊息（例如 &amp;ldquo;Something went wrong&amp;rdquo;），&lt;strong>看不到是哪一行程式碼出錯&lt;/strong>，導致除錯困難。&lt;/p>
+&lt;p>如果你堅持使用 &lt;code>logger.error&lt;/code>，強烈建議打開 &lt;code>exc_info&lt;/code>：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="k">except&lt;/span> &lt;span class="ne">Exception&lt;/span> &lt;span class="k">as&lt;/span> &lt;span class="n">e&lt;/span>&lt;span class="p">:&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1"># As same as `logger.exception`&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">logger&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;Failed to process data&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">exc_info&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="kc">True&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>這通常用於你希望 Log 級別是 WARNING 或 CRITICAL 但仍想保留 Traceback 時（例如：logger.warning(&amp;hellip;, exc_info=True)）。&lt;/p>
+&lt;h2>Message Formatting&lt;span class="hx-absolute -hx-mt-20" id="message-formatting">&lt;/span>
+&lt;a href="#message-formatting" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>傳遞變數到 Log 訊息時，格式化的方式會影響效能與 Log 聚合系統（如 Sentry, Datadog）的分類能力。&lt;/p>
+&lt;h3>Do: Lazy Formatting&lt;span class="hx-absolute -hx-mt-20" id="do-lazy-formatting">&lt;/span>
+&lt;a href="#do-lazy-formatting" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="n">logger&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;User &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="s2"> failed&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">user_id&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;ul>
+&lt;li>&lt;strong>優點&lt;/strong>：
+&lt;ol>
+&lt;li>&lt;strong>效能&lt;/strong>：只有當該 Log Level 真的被啟用時，才會進行字串運算。&lt;/li>
+&lt;li>&lt;strong>聚合 (Grouping)&lt;/strong>：Log 監控系統能識別 &lt;code>&amp;quot;User %s failed&amp;quot;&lt;/code> 是一個模板，將其歸類為同一種錯誤，而不是成千上萬個不同的錯誤。&lt;/li>
+&lt;/ol>
+&lt;/li>
+&lt;/ul>
+&lt;h3>Don&amp;rsquo;t: F-string&lt;span class="hx-absolute -hx-mt-20" id="dont-f-string">&lt;/span>
+&lt;a href="#dont-f-string" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="n">logger&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="sa">f&lt;/span>&lt;span class="s2">&amp;#34;User &lt;/span>&lt;span class="si">{&lt;/span>&lt;span class="n">user_id&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2"> failed&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;ul>
+&lt;li>&lt;strong>缺點&lt;/strong>：
+&lt;ol>
+&lt;li>字串插值會立即執行（即使 Log 不會被輸出）。&lt;/li>
+&lt;li>監控系統會以為每一條 Log 都是「全新的事件」，難以統計錯誤頻率。&lt;/li>
+&lt;/ol>
+&lt;/li>
+&lt;/ul>
+&lt;h4>Why not using F-string in log?&lt;span class="hx-absolute -hx-mt-20" id="why-not-using-f-string-in-log">&lt;/span>
+&lt;a href="#why-not-using-f-string-in-log" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>When using f-strings, log aggregation services (e.g., Sentry, Datadog, ELK) may treat each log message as a different error due to variable values in the message.&lt;/p>
+&lt;p>For example, suppose your system has 1,000 users who fail to log in within the same minute.&lt;/p>
+&lt;p>When using f-string, your code looks like:&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="n">logger&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="sa">f&lt;/span>&lt;span class="s2">&amp;#34;Login failed for user &lt;/span>&lt;span class="si">{&lt;/span>&lt;span class="n">user_id&lt;/span>&lt;span class="si">}&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>Python will produced a whole string and pass to the log service.&lt;/p>
+&lt;p>Then, your log service may show:&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align: left">Issue ID&lt;/th>
+&lt;th style="text-align: left">Error Message (Group Name)&lt;/th>
+&lt;th style="text-align: left">Count&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align: left">#1&lt;/td>
+&lt;td style="text-align: left">&lt;code>Login failed for user 1&lt;/code>&lt;/td>
+&lt;td style="text-align: left">1&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">#2&lt;/td>
+&lt;td style="text-align: left">&lt;code>Login failed for user 2&lt;/code>&lt;/td>
+&lt;td style="text-align: left">1&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">&amp;hellip;&lt;/td>
+&lt;td style="text-align: left">&amp;hellip;&lt;/td>
+&lt;td style="text-align: left">&amp;hellip;&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">#1000&lt;/td>
+&lt;td style="text-align: left">&lt;code>Login failed for user 1000&lt;/code>&lt;/td>
+&lt;td style="text-align: left">1&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>Result:&lt;/p>
+&lt;ul>
+&lt;li>Your issue list gets flooded, making it difficult to identify truly important new errors.&lt;/li>
+&lt;li>You also cannot set rules such as “send an alert if the same error occurs more than 50 times,” because from the system’s perspective, each error appears to have occurred only once.&lt;/li>
+&lt;/ul>
+&lt;p>But if we using lazy-formatting:&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="n">logger&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;Login failed for user &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">user_id&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>Python sends the log message template (&lt;code>Login failed for user %s&lt;/code>) and the arguments (&lt;code>101&lt;/code>) to the logging system separately.&lt;/p>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align: left">Issue ID&lt;/th>
+&lt;th style="text-align: left">Error Message (Group Name)&lt;/th>
+&lt;th style="text-align: left">Count&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align: left">#1&lt;/td>
+&lt;td style="text-align: left">&lt;code>Login failed for user %s&lt;/code>&lt;/td>
+&lt;td style="text-align: left">&lt;strong>1000&lt;/strong>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;p>You can clearly see that this error occurred 1,000 times, and you can drill down to view which specific user_ids were affected.&lt;/p>
+&lt;h2>Provide context&lt;span class="hx-absolute -hx-mt-20" id="provide-context">&lt;/span>
+&lt;a href="#provide-context" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;p>Log messages should describe &lt;strong>what was happening&lt;/strong>, not just &lt;strong>what the error was&lt;/strong>. (The traceback already contains the error message.)&lt;/p>
+&lt;ul>
+&lt;li>&lt;strong>Bad:&lt;/strong> &lt;code>logger.exception(f&amp;quot;Error: {e}&amp;quot;)&lt;/code>&lt;/li>
+&lt;li>&lt;strong>Good:&lt;/strong> &lt;code>logger.exception(&amp;quot;Failed to upload file to S3 bucket&amp;quot;)&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;p>This provides &lt;strong>business logic context&lt;/strong>. When you read the logs, you immediately understand what the code was trying to do.&lt;/p></description></item></channel></rss>
