@@ -1,4 +1,4 @@
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Inbox</title><link>https://pjfordev.com/notes/inbox/</link><description>Recent content in Inbox on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pjfordev.com/notes/inbox/index.xml" rel="self" type="application/rss+xml"/><item><title>未整理筆記：在 async 函數中執行 sync blocking function</title><link>https://pjfordev.com/notes/inbox/python_async/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pjfordev.com/notes/inbox/python_async/</guid><description>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Inbox</title><link>https://pjfordev.com/notes/inbox/</link><description>Recent content in Inbox on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pjfordev.com/notes/inbox/index.xml" rel="self" type="application/rss+xml"/><item><title>在 async 函數中執行 sync blocking function</title><link>https://pjfordev.com/notes/inbox/python_async/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pjfordev.com/notes/inbox/python_async/</guid><description>
 &lt;h2>Demo Code&lt;span class="hx-absolute -hx-mt-20" id="demo-code">&lt;/span>
 &lt;a href="#demo-code" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
 &lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">asyncio&lt;/span>
@@ -24,8 +24,8 @@ title="Copy code"
 &lt;/div>
 &lt;/div>
 &lt;hr>
-&lt;h2>Why It Work?&lt;span class="hx-absolute -hx-mt-20" id="why-it-work">&lt;/span>
-&lt;a href="#why-it-work" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;h3>Problem&lt;span class="hx-absolute -hx-mt-20" id="problem">&lt;/span>
+&lt;h2>What Happened?&lt;span class="hx-absolute -hx-mt-20" id="what-happened">&lt;/span>
+&lt;a href="#what-happened" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;h3>Problem&lt;span class="hx-absolute -hx-mt-20" id="problem">&lt;/span>
 &lt;a href="#problem" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>&lt;code>requests.get()&lt;/code> 是同步 blocking 函數。如果直接在 async 函數裡呼叫，會卡死整個 Event Loop：&lt;/p>
 &lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
 &lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># ❌ 錯誤寫法：直接呼叫會阻塞 Event Loop&lt;/span>
