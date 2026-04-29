@@ -55,8 +55,8 @@ Note over C: 無法執行
 EL--&amp;gt;&amp;gt;A: 數秒後回傳 response
 Note over EL: 才能繼續處理其他 coroutine
 &lt;/pre>&lt;hr>
-&lt;h3>Explaination&lt;span class="hx-absolute -hx-mt-20" id="explaination">&lt;/span>
-&lt;a href="#explaination" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;h4>1. &lt;code>asyncio.get_running_loop()&lt;/code>&lt;span class="hx-absolute -hx-mt-20" id="1-asyncioget_running_loop">&lt;/span>
+&lt;h3>Explanation&lt;span class="hx-absolute -hx-mt-20" id="explanation">&lt;/span>
+&lt;a href="#explanation" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;h4>1. &lt;code>asyncio.get_running_loop()&lt;/code>&lt;span class="hx-absolute -hx-mt-20" id="1-asyncioget_running_loop">&lt;/span>
 &lt;a href="#1-asyncioget_running_loop" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>取得目前正在執行的 Event Loop 物件。&lt;/p>
 &lt;ul>
 &lt;li>必須在 async 函數內呼叫&lt;/li>
