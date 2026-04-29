@@ -1,0 +1,247 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>PJ's Blog – Inbox</title><link>https://pjfordev.com/notes/inbox/</link><description>Recent content in Inbox on PJ's Blog</description><generator>Hugo -- gohugo.io</generator><language>en</language><atom:link href="https://pjfordev.com/notes/inbox/index.xml" rel="self" type="application/rss+xml"/><item><title>未整理筆記：在 async 函數中執行 sync blocking function</title><link>https://pjfordev.com/notes/inbox/python_async/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://pjfordev.com/notes/inbox/python_async/</guid><description>
+&lt;h2>Demo Code&lt;span class="hx-absolute -hx-mt-20" id="demo-code">&lt;/span>
+&lt;a href="#demo-code" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">asyncio&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">requests&lt;/span> &lt;span class="c1"># 同步 library&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">async&lt;/span> &lt;span class="k">def&lt;/span> &lt;span class="nf">job_func&lt;/span>&lt;span class="p">():&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">loop&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">asyncio&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get_running_loop&lt;/span>&lt;span class="p">()&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="c1"># 把整個 blocking call 包起來&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">response&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="k">await&lt;/span> &lt;span class="n">loop&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">run_in_executor&lt;/span>&lt;span class="p">(&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kc">None&lt;/span>&lt;span class="p">,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">lambda&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="n">requests&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;https://example.com&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">response&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">json&lt;/span>&lt;span class="p">()&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;hr>
+&lt;h2>Why It Work?&lt;span class="hx-absolute -hx-mt-20" id="why-it-work">&lt;/span>
+&lt;a href="#why-it-work" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;h3>Problem&lt;span class="hx-absolute -hx-mt-20" id="problem">&lt;/span>
+&lt;a href="#problem" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>&lt;code>requests.get()&lt;/code> 是同步 blocking 函數。如果直接在 async 函數裡呼叫，會卡死整個 Event Loop：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># ❌ 錯誤寫法：直接呼叫會阻塞 Event Loop&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">async&lt;/span> &lt;span class="k">def&lt;/span> &lt;span class="nf">job_func&lt;/span>&lt;span class="p">():&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">response&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">requests&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;https://example.com&amp;#34;&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="c1"># 卡住整個 loop&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;p>Event Loop 是單執行緒，一旦被 blocking 函數佔住，所有其他 coroutine 都會停擺。&lt;/p>
+&lt;pre class="mermaid hx-mt-6">
+sequenceDiagram
+participant EL as Event Loop（主執行緒）
+participant A as coroutine A (job_func)
+participant B as coroutine B
+participant C as coroutine C
+EL-&amp;gt;&amp;gt;A: 執行 job_func()
+A-&amp;gt;&amp;gt;EL: requests.get()（blocking）
+Note over EL,A: ⏸ Event Loop 凍結，等待網路 I/O
+Note over B: 無法執行
+Note over C: 無法執行
+EL--&amp;gt;&amp;gt;A: 數秒後回傳 response
+Note over EL: 才能繼續處理其他 coroutine
+&lt;/pre>&lt;hr>
+&lt;h3>Explaination&lt;span class="hx-absolute -hx-mt-20" id="explaination">&lt;/span>
+&lt;a href="#explaination" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;h4>1. &lt;code>asyncio.get_running_loop()&lt;/code>&lt;span class="hx-absolute -hx-mt-20" id="1-asyncioget_running_loop">&lt;/span>
+&lt;a href="#1-asyncioget_running_loop" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>取得目前正在執行的 Event Loop 物件。&lt;/p>
+&lt;ul>
+&lt;li>必須在 async 函數內呼叫&lt;/li>
+&lt;li>保證拿到的是「同一個」loop，&lt;code>await&lt;/code> 才能正確接收結果&lt;/li>
+&lt;li>不能用 &lt;code>new_event_loop()&lt;/code>，那會建立一個全新、閒置的 loop，Future 永遠不會被處理&lt;/li>
+&lt;/ul>
+&lt;h4>2. &lt;code>loop.run_in_executor(None, lambda: requests.get(...))&lt;/code>&lt;span class="hx-absolute -hx-mt-20" id="2-looprun_in_executornone-lambda-requestsget">&lt;/span>
+&lt;a href="#2-looprun_in_executornone-lambda-requestsget" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>做了三件事：&lt;/p>
+&lt;ol>
+&lt;li>把 &lt;code>lambda&lt;/code> 丟到 &lt;strong>ThreadPool&lt;/strong>（背景執行緒）去執行&lt;/li>
+&lt;li>建立一個 &lt;strong>Future&lt;/strong> 物件代表「還沒完成的結果」&lt;/li>
+&lt;li>立刻回傳那個 Future（不等結果）&lt;/li>
+&lt;/ol>
+&lt;p>&lt;code>None&lt;/code> 表示使用預設的 &lt;code>ThreadPoolExecutor&lt;/code>，執行緒數量 = &lt;code>min(32, cpu_count + 4)&lt;/code>。&lt;/p>
+&lt;h4>3. &lt;code>await&lt;/code>&lt;span class="hx-absolute -hx-mt-20" id="3-await">&lt;/span>
+&lt;a href="#3-await" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>Event Loop 看到 &lt;code>await&lt;/code> 後：&lt;/p>
+&lt;ul>
+&lt;li>把這個 coroutine &lt;strong>掛起&lt;/strong>，釋放執行緒&lt;/li>
+&lt;li>&lt;strong>去跑其他 coroutine&lt;/strong>，不閒置&lt;/li>
+&lt;li>等 ThreadPool 的執行緒完成，把結果寫進 Future&lt;/li>
+&lt;li>Future resolved → &lt;strong>喚醒&lt;/strong>這個 coroutine，繼續執行&lt;/li>
+&lt;/ul>
+&lt;pre class="mermaid hx-mt-6">
+stateDiagram-v2
+direction LR
+[*] --&amp;gt; 執行中
+執行中 --&amp;gt; 掛起 : await Future\n（run_in_executor 建立）
+掛起 --&amp;gt; 執行中 : Future resolved\n（ThreadPool 完成任務）
+執行中 --&amp;gt; [*] : return
+&lt;/pre>&lt;h4>4. 為什麼用 &lt;code>lambda&lt;/code>？&lt;span class="hx-absolute -hx-mt-20" id="4-為什麼用-lambda">&lt;/span>
+&lt;a href="#4-%e7%82%ba%e4%bb%80%e9%ba%bc%e7%94%a8-lambda" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h4>&lt;p>&lt;code>run_in_executor&lt;/code> 只接受 &lt;code>callable&lt;/code>，&lt;code>lambda&lt;/code> 把 &lt;code>requests.get(url)&lt;/code> 包成一個無參數的函數，方便傳入。&lt;/p>
+&lt;p>如果需要傳參數，也可以用 &lt;code>functools.partial&lt;/code>：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">from&lt;/span> &lt;span class="nn">functools&lt;/span> &lt;span class="kn">import&lt;/span> &lt;span class="n">partial&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">response&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="k">await&lt;/span> &lt;span class="n">loop&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">run_in_executor&lt;/span>&lt;span class="p">(&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="kc">None&lt;/span>&lt;span class="p">,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">partial&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">requests&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;https://example.com&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">timeout&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="mi">5&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;hr>
+&lt;h2>Workflow&lt;span class="hx-absolute -hx-mt-20" id="workflow">&lt;/span>
+&lt;a href="#workflow" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;pre class="mermaid hx-mt-6">
+sequenceDiagram
+participant EL as Event Loop（主執行緒）
+participant TP as ThreadPool（背景執行緒）
+EL-&amp;gt;&amp;gt;EL: job_func() 開始執行
+EL-&amp;gt;&amp;gt;TP: run_in_executor(lambda: requests.get(...))
+Note over EL: 建立 Future，掛起 coroutine
+EL-&amp;gt;&amp;gt;EL: 去跑其他 coroutine
+TP-&amp;gt;&amp;gt;TP: requests.get() 執行中（等網路回應）
+TP--&amp;gt;&amp;gt;EL: 完成，把 response 寫進 Future
+Note over EL: Future resolved，喚醒 coroutine
+EL-&amp;gt;&amp;gt;EL: response = 拿到結果
+EL-&amp;gt;&amp;gt;EL: return response.json()
+&lt;/pre>&lt;hr>
+&lt;h2>&lt;code>asyncio.to_thread&lt;/code>（Python 3.9+）&lt;span class="hx-absolute -hx-mt-20" id="asyncioto_threadpython-39">&lt;/span>
+&lt;a href="#asyncioto_threadpython-39" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;h3>用法&lt;span class="hx-absolute -hx-mt-20" id="用法">&lt;/span>
+&lt;a href="#%e7%94%a8%e6%b3%95" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">asyncio&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="kn">import&lt;/span> &lt;span class="nn">requests&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">async&lt;/span> &lt;span class="k">def&lt;/span> &lt;span class="nf">job_func&lt;/span>&lt;span class="p">():&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">response&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="k">await&lt;/span> &lt;span class="n">asyncio&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">to_thread&lt;/span>&lt;span class="p">(&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">requests&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;https://example.com&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">response&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">json&lt;/span>&lt;span class="p">()&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;h3>它做了什麼？&lt;span class="hx-absolute -hx-mt-20" id="它做了什麼">&lt;/span>
+&lt;a href="#%e5%ae%83%e5%81%9a%e4%ba%86%e4%bb%80%e9%ba%bc" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;p>&lt;code>asyncio.to_thread&lt;/code> 是 &lt;code>run_in_executor&lt;/code> 的高階封裝，內部等同於：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="n">loop&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">asyncio&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get_running_loop&lt;/span>&lt;span class="p">()&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">await&lt;/span> &lt;span class="n">loop&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">run_in_executor&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="kc">None&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">func&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">args&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="o">**&lt;/span>&lt;span class="n">kwargs&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;pre class="mermaid hx-mt-6">
+flowchart TB
+A[&amp;#34;asyncio.to_thread(func, *args)&amp;#34;] --&amp;gt; B[&amp;#34;loop.run_in_executor(None, func, *args)&amp;#34;]
+B --&amp;gt; C[&amp;#34;ThreadPoolExecutor（預設）&amp;#34;]
+C --&amp;gt; D[&amp;#34;背景執行緒執行 func()&amp;#34;]
+&lt;/pre>&lt;p>差別在於它直接接受參數，不需要 &lt;code>lambda&lt;/code> 或 &lt;code>partial&lt;/code>：&lt;/p>
+&lt;div class="hextra-code-block hx-relative hx-mt-6 first:hx-mt-0 hx-group/code">
+&lt;div>&lt;div class="highlight">&lt;pre tabindex="0" class="chroma">&lt;code class="language-python" data-lang="python">&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># run_in_executor：需要包成 lambda 或用 partial&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">await&lt;/span> &lt;span class="n">loop&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">run_in_executor&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="kc">None&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">lambda&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="n">requests&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">url&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">timeout&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="mi">5&lt;/span>&lt;span class="p">))&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1"># to_thread：直接傳函數與參數&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">await&lt;/span> &lt;span class="n">asyncio&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">to_thread&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">requests&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">get&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">url&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">timeout&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="mi">5&lt;/span>&lt;span class="p">)&lt;/span>&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/div>&lt;/div>&lt;div class="hextra-code-copy-btn-container hx-opacity-0 hx-transition group-hover/code:hx-opacity-100 hx-flex hx-gap-1 hx-absolute hx-m-[11px] hx-right-0 hx-top-0">
+&lt;button
+class="hextra-code-copy-btn hx-group/copybtn hx-transition-all active:hx-opacity-50 hx-bg-primary-700/5 hx-border hx-border-black/5 hx-text-gray-600 hover:hx-text-gray-900 hx-rounded-md hx-p-1.5 dark:hx-bg-primary-300/10 dark:hx-border-white/10 dark:hx-text-gray-400 dark:hover:hx-text-gray-50"
+title="Copy code"
+>
+&lt;div class="copy-icon group-[.copied]/copybtn:hx-hidden hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;div class="success-icon hx-hidden group-[.copied]/copybtn:hx-block hx-pointer-events-none hx-h-4 hx-w-4">&lt;/div>
+&lt;/button>
+&lt;/div>
+&lt;/div>
+&lt;hr>
+&lt;h2>比較：三種寫法&lt;span class="hx-absolute -hx-mt-20" id="比較三種寫法">&lt;/span>
+&lt;a href="#%e6%af%94%e8%bc%83%e4%b8%89%e7%a8%ae%e5%af%ab%e6%b3%95" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align: left">&lt;/th>
+&lt;th style="text-align: left">&lt;code>run_in_executor&lt;/code>&lt;/th>
+&lt;th style="text-align: left">&lt;code>to_thread&lt;/code>&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align: left">Python 版本&lt;/td>
+&lt;td style="text-align: left">3.4+&lt;/td>
+&lt;td style="text-align: left">3.9+&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">寫法複雜度&lt;/td>
+&lt;td style="text-align: left">較繁瑣，需要 &lt;code>get_running_loop()&lt;/code>&lt;/td>
+&lt;td style="text-align: left">簡潔，直接呼叫&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">傳參數&lt;/td>
+&lt;td style="text-align: left">需要 &lt;code>lambda&lt;/code> 或 &lt;code>partial&lt;/code>&lt;/td>
+&lt;td style="text-align: left">直接傳 &lt;code>*args, **kwargs&lt;/code>&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">自訂 Executor&lt;/td>
+&lt;td style="text-align: left">可以指定 &lt;code>ThreadPoolExecutor&lt;/code>&lt;/td>
+&lt;td style="text-align: left">只能用預設 Executor&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">底層機制&lt;/td>
+&lt;td style="text-align: left">直接操作 loop&lt;/td>
+&lt;td style="text-align: left">封裝 &lt;code>run_in_executor(None, ...)&lt;/code>&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table>
+&lt;h3>什麼時候用哪個？&lt;span class="hx-absolute -hx-mt-20" id="什麼時候用哪個">&lt;/span>
+&lt;a href="#%e4%bb%80%e9%ba%bc%e6%99%82%e5%80%99%e7%94%a8%e5%93%aa%e5%80%8b" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h3>&lt;ul>
+&lt;li>&lt;strong>一般情況&lt;/strong> → 用 &lt;code>to_thread&lt;/code>，更簡潔易讀&lt;/li>
+&lt;li>&lt;strong>需要自訂 thread 數量或使用 &lt;code>ProcessPoolExecutor&lt;/code>&lt;/strong> → 用 &lt;code>run_in_executor&lt;/code>&lt;/li>
+&lt;/ul>
+&lt;hr>
+&lt;h2>關鍵原則&lt;span class="hx-absolute -hx-mt-20" id="關鍵原則">&lt;/span>
+&lt;a href="#%e9%97%9c%e9%8d%b5%e5%8e%9f%e5%89%87" class="subheading-anchor" aria-label="Permalink for this section">&lt;/a>&lt;/h2>&lt;blockquote>
+&lt;p>&lt;code>requests.get()&lt;/code> 跑在別的執行緒，Event Loop 的執行緒完全沒被卡住，其他 coroutine 可以繼續執行。&lt;/p>
+&lt;/blockquote>
+&lt;table>
+&lt;thead>
+&lt;tr>
+&lt;th style="text-align: left">&lt;/th>
+&lt;th style="text-align: left">執行位置&lt;/th>
+&lt;th style="text-align: left">是否阻塞 Event Loop&lt;/th>
+&lt;/tr>
+&lt;/thead>
+&lt;tbody>
+&lt;tr>
+&lt;td style="text-align: left">&lt;code>requests.get()&lt;/code> 直接呼叫&lt;/td>
+&lt;td style="text-align: left">Event Loop 執行緒&lt;/td>
+&lt;td style="text-align: left">✅ 會阻塞&lt;/td>
+&lt;/tr>
+&lt;tr>
+&lt;td style="text-align: left">透過 &lt;code>run_in_executor&lt;/code>&lt;/td>
+&lt;td style="text-align: left">ThreadPool 執行緒&lt;/td>
+&lt;td style="text-align: left">❌ 不會阻塞&lt;/td>
+&lt;/tr>
+&lt;/tbody>
+&lt;/table></description></item></channel></rss>
